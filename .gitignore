@@ -1,0 +1,13 @@
+### Android template
+
+# Gradle files
+.gradle/
+build/
+
+# Local configuration file (sdk path, etc)
+local.properties
+
+# Intellij
+*.iml
+.idea/workspace.xml
+
