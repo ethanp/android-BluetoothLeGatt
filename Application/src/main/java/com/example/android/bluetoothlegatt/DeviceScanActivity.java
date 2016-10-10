@@ -26,17 +26,11 @@ import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
 import android.os.Handler;
-import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
-import android.view.ViewGroup;
-import android.widget.BaseAdapter;
 import android.widget.ListView;
-import android.widget.TextView;
 import android.widget.Toast;
-
-import java.util.ArrayList;
 
 /**
  * Activity for scanning and displaying available Bluetooth LE devices.
@@ -99,19 +93,25 @@ public class DeviceScanActivity extends ListActivity {
         }
     }
 
+    /**
+     * I think this get's called whether app is first booting or rebooting
+     */
     @Override
     protected void onResume() {
         super.onResume();
 
-        // Ensures Bluetooth is enabled on the device.  If Bluetooth is not currently enabled,
-        // fire an intent to display a dialog asking the user to grant permission to enable it.
+        // We know bluetooth EXISTS on the device. However, if Bluetooth is
+        // not currently ENABLED, display a dialog asking the user to grant
+        // permission to enable it.
         if (!mBluetoothAdapter.isEnabled()) {
             Intent enableBtIntent = new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE);
             startActivityForResult(enableBtIntent, REQUEST_ENABLE_BT);
         }
 
-        // Initializes list view adapter.
-        mLeDeviceListAdapter = new LeDeviceListAdapter();
+        /* I guess we end up here if the user clicked "enable"? */
+
+        // Initialize list view adapter.
+        mLeDeviceListAdapter = new LeDeviceListAdapter(getLayoutInflater());
         setListAdapter(mLeDeviceListAdapter);
         startScan();
     }
@@ -123,8 +123,8 @@ public class DeviceScanActivity extends ListActivity {
         mLeDeviceListAdapter.clear();
     }
 
-    // This is only called once, the first time the options menu is displayed.
-    // To update the menu every time it is displayed, see onPrepareOptionsMenu(Menu).
+    // This is NORMALLY only called once, the first time the options menu is displayed.
+    // However, we call "invalidateOptionsMenu()" below, so this does get re-used.
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
         // A `MenuInflater` is used to instantiate menu XML files into Menu objects.
@@ -173,7 +173,6 @@ public class DeviceScanActivity extends ListActivity {
             @Override
             public void run() {
                 stopScan();
-                invalidateOptionsMenu();
             }
         }, SCAN_PERIOD);
 
@@ -195,81 +194,9 @@ public class DeviceScanActivity extends ListActivity {
         final Intent intent = new Intent(this, DeviceControlActivity.class);
         intent.putExtra(DeviceControlActivity.EXTRAS_DEVICE_NAME, device.getName());
         intent.putExtra(DeviceControlActivity.EXTRAS_DEVICE_ADDRESS, device.getAddress());
-        if (isScanning) {
-            mBluetoothAdapter.stopLeScan(mLeScanCallback);
-            isScanning = false;
-        }
+        if (isScanning) stopScan();
+        // You will not receive any info when the activity exits.
         startActivity(intent);
     }
 
-    static class ViewHolder {
-        TextView deviceName;
-        TextView deviceAddress;
-    }
-
-    // Adapter for holding devices found through scanning.
-    private class LeDeviceListAdapter extends BaseAdapter {
-        private ArrayList<BluetoothDevice> mLeDevices;
-        private LayoutInflater mInflater;
-
-        LeDeviceListAdapter() {
-            super();
-            mLeDevices = new ArrayList<>();
-            mInflater = DeviceScanActivity.this.getLayoutInflater();
-        }
-
-        void addDevice(BluetoothDevice device) {
-            if (!mLeDevices.contains(device)) {
-                mLeDevices.add(device);
-            }
-        }
-
-        BluetoothDevice getDevice(int position) {
-            return mLeDevices.get(position);
-        }
-
-        void clear() {
-            mLeDevices.clear();
-        }
-
-        @Override
-        public int getCount() {
-            return mLeDevices.size();
-        }
-
-        @Override
-        public Object getItem(int i) {
-            return mLeDevices.get(i);
-        }
-
-        @Override
-        public long getItemId(int i) {
-            return i;
-        }
-
-        @Override
-        public View getView(int i, View view, ViewGroup viewGroup) {
-            ViewHolder viewHolder;
-            // General ListView optimization code.
-            if (view == null) {
-                view = mInflater.inflate(R.layout.listitem_device, null);
-                viewHolder = new ViewHolder();
-                viewHolder.deviceAddress = (TextView) view.findViewById(R.id.device_address);
-                viewHolder.deviceName = (TextView) view.findViewById(R.id.device_name);
-                view.setTag(viewHolder);
-            } else {
-                viewHolder = (ViewHolder) view.getTag();
-            }
-
-            BluetoothDevice device = mLeDevices.get(i);
-            final String deviceName = device.getName();
-            if (deviceName != null && deviceName.length() > 0)
-                viewHolder.deviceName.setText(deviceName);
-            else
-                viewHolder.deviceName.setText(R.string.unknown_device);
-            viewHolder.deviceAddress.setText(device.getAddress());
-
-            return view;
-        }
-    }
 }
