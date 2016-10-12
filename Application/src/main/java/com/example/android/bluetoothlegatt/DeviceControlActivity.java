@@ -80,8 +80,7 @@ public class DeviceControlActivity extends Activity {
         }
     };
     private boolean mConnected = false;
-    private ArrayList<ArrayList<BluetoothGattCharacteristic>> mGattCharacteristics =
-            new ArrayList<>();
+    private ArrayList<ArrayList<BluetoothGattCharacteristic>> mGattChartics = new ArrayList<>();
 
     // Handles various events fired by the Service.
     // ACTION_GATT_CONNECTED: connected to a GATT server.
@@ -120,11 +119,16 @@ public class DeviceControlActivity extends Activity {
     private final ExpandableListView.OnChildClickListener servicesListClickListener =
             new ExpandableListView.OnChildClickListener() {
                 @Override
-                public boolean onChildClick(ExpandableListView parent, View v, int groupPosition,
-                                            int childPosition, long id) {
-                    if (mGattCharacteristics != null) {
+                public boolean onChildClick(
+                        ExpandableListView parent,
+                        View v,
+                        int groupIdx,
+                        int childIdx,
+                        long id // unused
+                ) {
+                    if (mGattChartics != null) {
                         final BluetoothGattCharacteristic characteristic =
-                                mGattCharacteristics.get(groupPosition).get(childPosition);
+                                mGattChartics.get(groupIdx).get(childIdx);
                         final int charaProp = characteristic.getProperties();
                         if ((charaProp | BluetoothGattCharacteristic.PROPERTY_READ) > 0) {
                             // If there is an active notification on a characteristic, clear
@@ -184,6 +188,11 @@ public class DeviceControlActivity extends Activity {
         bindService(gattServiceIntent, mServiceConnection, BIND_AUTO_CREATE);
     }
 
+    /**
+     * Called every time this activity loads, regardless of whether it has loaded before.
+     *
+     * See lifecycle: https://developer.android.com/images/activity_lifecycle.png
+     */
     @Override
     protected void onResume() {
         super.onResume();
@@ -263,46 +272,42 @@ public class DeviceControlActivity extends Activity {
         }
     }
 
-    // Demonstrates how to iterate through the supported GATT Services/Characteristics.
-    // In this sample, we populate the data structure that is bound to the ExpandableListView
-    // on the UI.
+    /**
+     * Called from the callback for onServicesDiscovered()
+     *
+     * Demonstrates how to iterate through the supported GATT Services/Characteristics.
+     * In this sample, we populate the data structure that is bound to the ExpandableListView
+     * on the UI.
+     */
     private void displayGattServices(List<BluetoothGattService> gattServices) {
         if (gattServices == null) return;
         String unknownServiceString = getResources().getString(R.string.unknown_service);
-        String unknownCharaString = getResources().getString(R.string.unknown_characteristic);
+        String unknownCharticString = getResources().getString(R.string.unknown_characteristic);
         ArrayList<HashMap<String, String>> gattServiceData = new ArrayList<>();
-        ArrayList<ArrayList<HashMap<String, String>>> gattCharacteristicData
-                = new ArrayList<>();
-        mGattCharacteristics = new ArrayList<>();
+        ArrayList<ArrayList<HashMap<String, String>>> gattCharticData = new ArrayList<>();
+        mGattChartics = new ArrayList<>();
 
         // Loops through available GATT Services.
         for (BluetoothGattService gattService : gattServices) {
+            // get service metadata to create group
             HashMap<String, String> currentServiceData = new HashMap<>();
-            String uuid = gattService.getUuid().toString();
-            currentServiceData.put(
-                    LIST_NAME, SampleGattAttributes.lookup(uuid, unknownServiceString));
-            currentServiceData.put(LIST_UUID, uuid);
+            String svcUuid = gattService.getUuid().toString();
+            String serviceName = SampleGattAttrs.lookup(svcUuid, unknownServiceString);
+            currentServiceData.put(LIST_NAME, serviceName);
+            currentServiceData.put(LIST_UUID, svcUuid);
             gattServiceData.add(currentServiceData);
 
-            ArrayList<HashMap<String, String>> gattCharacteristicGroupData =
-                    new ArrayList<>();
-            List<BluetoothGattCharacteristic> gattCharacteristics =
-                    gattService.getCharacteristics();
-            ArrayList<BluetoothGattCharacteristic> characteristics =
-                    new ArrayList<>();
-
-            // Loops through available Characteristics.
-            for (BluetoothGattCharacteristic gattCharacteristic : gattCharacteristics) {
-                characteristics.add(gattCharacteristic);
-                HashMap<String, String> currentCharaData = new HashMap<>();
-                uuid = gattCharacteristic.getUuid().toString();
-                currentCharaData.put(
-                        LIST_NAME, SampleGattAttributes.lookup(uuid, unknownCharaString));
-                currentCharaData.put(LIST_UUID, uuid);
-                gattCharacteristicGroupData.add(currentCharaData);
+            ArrayList<HashMap<String, String>> gattCharticGroupData = new ArrayList<>();
+            for (BluetoothGattCharacteristic svcChartic : gattService.getCharacteristics()) {
+                String charticUuid = svcChartic.getUuid().toString();
+                String charticName = SampleGattAttrs.lookup(charticUuid, unknownCharticString);
+                HashMap<String, String> currentCharticData = new HashMap<>();
+                currentCharticData.put(LIST_NAME, charticName);
+                currentCharticData.put(LIST_UUID, charticUuid);
+                gattCharticGroupData.add(currentCharticData);
             }
-            mGattCharacteristics.add(characteristics);
-            gattCharacteristicData.add(gattCharacteristicGroupData);
+            gattCharticData.add(gattCharticGroupData);
+            mGattChartics.add(new ArrayList<>(gattService.getCharacteristics()));
         }
 
         SimpleExpandableListAdapter gattServiceAdapter = new SimpleExpandableListAdapter(
@@ -311,7 +316,7 @@ public class DeviceControlActivity extends Activity {
                 android.R.layout.simple_expandable_list_item_2,
                 new String[]{LIST_NAME, LIST_UUID},
                 new int[]{android.R.id.text1, android.R.id.text2},
-                gattCharacteristicData,
+                gattCharticData,
                 android.R.layout.simple_expandable_list_item_2,
                 new String[]{LIST_NAME, LIST_UUID},
                 new int[]{android.R.id.text1, android.R.id.text2}
